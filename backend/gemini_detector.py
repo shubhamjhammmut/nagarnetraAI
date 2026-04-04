@@ -1,22 +1,20 @@
 import json
 import re
-from PIL import Image
 from google import genai
 import os
 from dotenv import load_dotenv
+
 load_dotenv()
+
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
 
 def extract_json(text):
-    """Extract clean JSON from Gemini response"""
     try:
         return json.loads(text)
     except:
-        # remove markdown ```json ```
         text = re.sub(r"```json|```", "", text).strip()
 
-        # extract JSON block
         match = re.search(r"\{.*\}", text, re.DOTALL)
         if match:
             try:
@@ -27,10 +25,8 @@ def extract_json(text):
     return None
 
 
-def analyze_image(image_path):
+def analyze_image(image_bytes):
     try:
-        image = Image.open(image_path).convert("RGB")
-
         prompt = """
         Analyze this image and return ONLY valid JSON.
 
@@ -38,9 +34,8 @@ def analyze_image(image_path):
           "issue": "pothole | garbage | waterlogging | traffic | broken road | no issue",
           "severity": "low | medium | high",
           "confidence": 0.0 to 1.0,
-          "description": "clear short sentence"
+          "description": "clear short sentence",
           "why_it_matters": "1-2 lines explaining impact on public"
-
         }
 
         IMPORTANT:
@@ -50,8 +45,21 @@ def analyze_image(image_path):
         """
 
         response = client.models.generate_content(
-            model="models/gemini-3-flash-preview",
-            contents=[prompt, image]
+            model="gemini-1.5-flash",
+            contents=[
+                {
+                    "role": "user",
+                    "parts": [
+                        {"text": prompt},
+                        {
+                            "inline_data": {
+                                "mime_type": "image/jpeg",
+                                "data": image_bytes
+                            }
+                        }
+                    ]
+                }
+            ]
         )
 
         raw_text = response.text
@@ -61,12 +69,12 @@ def analyze_image(image_path):
         if parsed:
             return parsed
 
-        # fallback if parsing fails
         return {
             "issue": "unknown",
             "severity": "low",
             "confidence": 0.5,
-            "description": raw_text[:200]
+            "description": raw_text[:200],
+            "why_it_matters": ""
         }
 
     except Exception as e:
@@ -74,5 +82,6 @@ def analyze_image(image_path):
             "issue": "unknown",
             "severity": "low",
             "confidence": 0.0,
-            "description": str(e)
+            "description": str(e),
+            "why_it_matters": ""
         }
