@@ -81,6 +81,7 @@ export function TrackIssuesPage({
         const d = doc.data();
 
         return {
+<<<<<<< HEAD
           id: doc.id,
           image: d.imageUrl || "",
           title: d.title || d.issueType || "Civic Issue",
@@ -101,6 +102,42 @@ export function TrackIssuesPage({
             : "N/A",
           reportedBy: d.userEmail || "Unknown",
           ai: d.ai,
+=======
+  id: doc.id,
+  image: d.imageUrl || "",
+  title: d.issueType || "Civic Issue",
+
+  location:
+    d.address ||
+    (d.latitude && d.longitude
+      ? `${d.latitude}, ${d.longitude}`
+      : "Location not available"),
+
+  status:
+    d.status === "resolved"
+      ? "Resolved"
+      : d.status === "in_progress"
+      ? "In Progress"
+      : d.status === "open"
+      ? "Pending"
+      : "Pending",
+
+  urgency: d.urgency || "Low",
+
+  date: d.createdAt?.seconds
+    ? new Date(d.createdAt.seconds * 1000).toLocaleDateString()
+    : "N/A",
+
+  reportedBy: d.userEmail || "Unknown",
+
+  ai: {
+    description_en: d.description || "",
+    description_hi: d.description || "",
+    why_it_matters: d.aiAnalysis || "",
+    severity_level: d.urgency || "Low",
+  },
+
+>>>>>>> fcd56444 (all commit)
         };
       });
 
@@ -194,7 +231,11 @@ export function TrackIssuesPage({
           {filteredIssues.map((issue) => (
             <div
               key={issue.id}
+<<<<<<< HEAD
               className="bg-white rounded-xl shadow-sm overflow-hidden"
+=======
+              className="bg-white rounded-xl shadow-md hover:shadow-lg transition duration-200 overflow-hidden"
+>>>>>>> fcd56444 (all commit)
             >
               {issue.image && (
                 <img
@@ -205,7 +246,11 @@ export function TrackIssuesPage({
 
               <div className="p-5 space-y-3">
                 <div className="flex justify-between items-center">
+<<<<<<< HEAD
                   <h3 className="font-semibold">{issue.title}</h3>
+=======
+                 <h3 className="font-semibold text-lg">{issue.title}</h3>
+>>>>>>> fcd56444 (all commit)
                   <span
                     className={`px-3 py-1 rounded-full text-xs ${severityColor(
                       issue.urgency
@@ -222,7 +267,21 @@ export function TrackIssuesPage({
                 >
                   {issue.status}
                 </span>
+<<<<<<< HEAD
 
+=======
+<div className="w-full bg-gray-200 rounded-full h-2 mt-2">
+  <div
+    className={`h-2 rounded-full transition-all duration-500 ${
+      issue.status === "Resolved"
+        ? "bg-green-500 w-full"
+        : issue.status === "In Progress"
+        ? "bg-yellow-500 w-2/3"
+        : "bg-red-500 w-1/3"
+    }`}
+  />
+</div>
+>>>>>>> fcd56444 (all commit)
                 <div className="text-sm text-gray-600 space-y-1">
                   <div className="flex gap-2 items-center">
                     <MapPin className="w-4 h-4" />
@@ -280,13 +339,22 @@ export function TrackIssuesPage({
 
               <p className="text-sm text-gray-700">
                 {lang === "en"
+<<<<<<< HEAD
                   ? selectedIssue.ai?.description_en
                   : selectedIssue.ai?.description_hi}
+=======
+  ? selectedIssue.ai?.description_en || "No description available"
+  : selectedIssue.ai?.description_hi || selectedIssue.ai?.description_en || "No description available"}
+>>>>>>> fcd56444 (all commit)
               </p>
 
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm">
                 <strong>Why this matters:</strong>{" "}
+<<<<<<< HEAD
                 {selectedIssue.ai?.why_it_matters}
+=======
+                {selectedIssue.ai?.why_it_matters || "This issue may affect public hygiene and safety."}
+>>>>>>> fcd56444 (all commit)
               </div>
             </div>
           )}

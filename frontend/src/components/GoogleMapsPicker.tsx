@@ -14,7 +14,7 @@ interface GoogleMapsPickerProps {
 }
 
 // Google Maps API Key - Replace with your actual API key
-const GOOGLE_MAPS_API_KEY = 'AIzaSyBRpP4I3FxQvCPn_KmjAeN_U4MTw7inXZE';
+const GOOGLE_MAPS_API_KEY = 'AIzaSyCpcNr6EjWQlGh1KEZoEfavMxtzYSmY0sY';
 
 // Default location: Gorakhpur, Uttar Pradesh, India
 const DEFAULT_LOCATION = {

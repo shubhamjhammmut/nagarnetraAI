@@ -1,12 +1,5 @@
 import { useEffect, useState } from "react";
 import {
-  LayoutDashboard,
-  List,
-  AlertTriangle,
-  Users,
-} from "lucide-react";
-
-import {
   collection,
   onSnapshot,
   doc,
@@ -15,6 +8,8 @@ import {
   orderBy,
 } from "firebase/firestore";
 import { db } from "../firebase/firebase";
+
+/* ---------------- TYPES ---------------- */
 
 type TabType = "dashboard" | "issues";
 
@@ -29,9 +24,11 @@ interface IssueData {
   category: string;
   latitude?: number;
   longitude?: number;
+  address?: string;
+  imageUrl?: string;
   urgency: "Low" | "Medium" | "High" | "Critical";
   urgencyScore: number;
-  status: "Issue Raised" | "Authorities Contacted" | "Issue Resolved";
+  status: "Pending" | "In Progress" | "Resolved";
   reportedDate: string;
   reporters: Reporter[];
   aiAnalysis?: string;
@@ -39,17 +36,10 @@ interface IssueData {
 
 /* ---------------- HELPERS ---------------- */
 
-const mapSeverityToUrgency = (severity: number) => {
-  if (severity >= 8) return "Critical";
-  if (severity >= 6) return "High";
-  if (severity >= 4) return "Medium";
-  return "Low";
-};
-
 const mapStatus = (status: string) => {
-  if (status === "resolved") return "Issue Resolved";
-  if (status === "in_progress") return "Authorities Contacted";
-  return "Issue Raised";
+  if (status === "resolved") return "Resolved";
+  if (status === "in_progress") return "In Progress";
+  return "Pending";
 };
 
 /* ---------------- COMPONENT ---------------- */
@@ -59,7 +49,7 @@ export function AdminDashboard() {
   const [selectedIssue, setSelectedIssue] = useState<IssueData | null>(null);
   const [issues, setIssues] = useState<IssueData[]>([]);
 
-  /* ---------- REAL-TIME FIRESTORE ---------- */
+  /* ---------- FIRESTORE ---------- */
   useEffect(() => {
     const q = query(
       collection(db, "issues"),
@@ -76,18 +66,24 @@ export function AdminDashboard() {
           category: d.issueType || "Unknown",
           latitude: d.latitude,
           longitude: d.longitude,
-          urgency: mapSeverityToUrgency(d.severity || 4),
-          urgencyScore: (d.severity || 4) * 10,
+          address: d.address || "No address",
+          imageUrl: d.imageUrl || "",
+
+          urgency: d.urgency || "Low",
+          urgencyScore: d.urgencyScore || 40,
+
           status: mapStatus(d.status || "open"),
-          reportedDate: d.createdAt?.toDate().toDateString() || "",
+
+          reportedDate:
+            d.createdAt?.toDate?.().toDateString?.() || "N/A",
+
           reporters: Array(votes).fill({
             name: "Citizen",
             email: "",
             reportedDate: "",
           }),
-          aiAnalysis: d.severity
-            ? `AI detected severity ${d.severity}/10`
-            : "",
+
+          aiAnalysis: d.aiAnalysis || "",
         };
       });
 
@@ -100,12 +96,7 @@ export function AdminDashboard() {
   /* ---------- STATUS UPDATE ---------- */
   const updateStatus = async (id: string, status: string) => {
     await updateDoc(doc(db, "issues", id), {
-      status:
-        status === "Issue Resolved"
-          ? "resolved"
-          : status === "Authorities Contacted"
-          ? "in_progress"
-          : "open",
+      status: status,
       updatedAt: new Date(),
     });
 
@@ -115,80 +106,89 @@ export function AdminDashboard() {
   /* ---------- STATS ---------- */
   const stats = {
     total: issues.length,
-    pending: issues.filter((i) => i.status === "Issue Raised").length,
-    inProgress: issues.filter(
-      (i) => i.status === "Authorities Contacted"
-    ).length,
-    resolved: issues.filter(
-      (i) => i.status === "Issue Resolved"
-    ).length,
-    criticalHigh: issues.filter(
-      (i) => i.urgency === "Critical" || i.urgency === "High"
-    ).length,
-    duplicates: issues.filter(
-      (i) => i.reporters.length > 1
-    ).length,
+    pending: issues.filter((i) => i.status === "Pending").length,
+    inProgress: issues.filter((i) => i.status === "In Progress").length,
+    resolved: issues.filter((i) => i.status === "Resolved").length,
   };
 
   /* ---------- DASHBOARD ---------- */
   const renderDashboard = () => (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-      <div className="bg-white p-6 rounded">
-        Total Issues: {stats.total}
-      </div>
-      <div className="bg-white p-6 rounded">
-        Pending: {stats.pending}
-      </div>
-      <div className="bg-white p-6 rounded">
-        Critical / High: {stats.criticalHigh}
-      </div>
-      <div className="bg-white p-6 rounded">
-        Multi-Reporter: {stats.duplicates}
-      </div>
+      <div className="bg-white p-6 rounded shadow">Total: {stats.total}</div>
+      <div className="bg-white p-6 rounded shadow">Pending: {stats.pending}</div>
+      <div className="bg-white p-6 rounded shadow">In Progress: {stats.inProgress}</div>
+      <div className="bg-white p-6 rounded shadow">Resolved: {stats.resolved}</div>
     </div>
   );
 
   /* ---------- ISSUES TABLE ---------- */
   const renderIssues = () => (
-    <div className="bg-white rounded shadow">
-      <table className="w-full">
-        <thead>
-          <tr className="border-b">
-            <th className="p-3 text-left">Issue</th>
-            <th className="p-3">Urgency</th>
-            <th className="p-3">Reports</th>
-            <th className="p-3">Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          {issues.map((issue) => (
-            <tr key={issue.id} className="border-b">
-              <td className="p-3">{issue.category}</td>
-              <td className="p-3">{issue.urgency}</td>
-              <td className="p-3">{issue.reporters.length}</td>
-              <td className="p-3">
-                <button
-                  onClick={() => setSelectedIssue(issue)}
-                  className="text-blue-600"
-                >
-                  View
-                </button>
-              </td>
+    <div className="bg-white rounded shadow p-4">
+      {issues.length === 0 ? (
+        <p className="text-gray-500 text-center py-5">
+          No issues found
+        </p>
+      ) : (
+        <table className="w-full">
+          <thead>
+            <tr className="border-b text-left">
+              <th className="p-3">Issue</th>
+              <th className="p-3">Urgency</th>
+              <th className="p-3">Status</th>
+              <th className="p-3">Reports</th>
+              <th className="p-3">Action</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+
+          <tbody>
+            {issues.map((issue) => (
+              <tr key={issue.id} className="border-b hover:bg-gray-50">
+                <td className="p-3">{issue.category}</td>
+                <td className="p-3">{issue.urgency}</td>
+                <td className="p-3">{issue.status}</td>
+                <td className="p-3">{issue.reporters.length}</td>
+
+                <td className="p-3">
+                  <button
+                    onClick={() => setSelectedIssue(issue)}
+                    className="text-blue-600 hover:underline"
+                  >
+                    View
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
     </div>
   );
 
   /* ---------- MAIN ---------- */
   return (
     <div className="p-6">
+
+      {/* NAV */}
       <div className="flex gap-3 mb-6">
-        <button onClick={() => setActiveTab("dashboard")}>
+        <button
+          onClick={() => setActiveTab("dashboard")}
+          className={`px-4 py-2 rounded ${
+            activeTab === "dashboard"
+              ? "bg-blue-600 text-white"
+              : "bg-gray-200"
+          }`}
+        >
           Overview
         </button>
-        <button onClick={() => setActiveTab("issues")}>
+
+        <button
+          onClick={() => setActiveTab("issues")}
+          className={`px-4 py-2 rounded ${
+            activeTab === "issues"
+              ? "bg-blue-600 text-white"
+              : "bg-gray-200"
+          }`}
+        >
           Issues
         </button>
       </div>
@@ -199,34 +199,67 @@ export function AdminDashboard() {
       {/* ---------- MODAL ---------- */}
       {selectedIssue && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center">
-          <div className="bg-white p-6 rounded w-[420px]">
-            <h2 className="mb-2">{selectedIssue.category}</h2>
-            <p className="text-sm mb-3">
-              {selectedIssue.aiAnalysis}
+          <div className="bg-white p-6 rounded w-[500px] space-y-4">
+
+            {/* IMAGE */}
+            {selectedIssue.imageUrl && (
+              <img
+                src={selectedIssue.imageUrl}
+                className="w-full h-48 object-cover rounded"
+              />
+            )}
+
+            <h2 className="font-semibold text-lg">
+              {selectedIssue.category}
+            </h2>
+
+            <p className="text-sm text-gray-600">
+              {selectedIssue.aiAnalysis || "No AI analysis"}
+            </p>
+
+            {/* ADDRESS */}
+            <p className="text-sm">
+              📍 {selectedIssue.address}
+            </p>
+
+            {/* MAP LINK */}
+            {selectedIssue.latitude && selectedIssue.longitude && (
+              <a
+                href={`https://www.google.com/maps?q=${selectedIssue.latitude},${selectedIssue.longitude}`}
+                target="_blank"
+                className="text-blue-600 text-sm underline"
+              >
+                View on Map
+              </a>
+            )}
+
+            {/* STATUS */}
+            <p className="text-sm">
+              Current Status: <strong>{selectedIssue.status}</strong>
             </p>
 
             <select
-              className="w-full border p-2 mb-3"
-              defaultValue={selectedIssue.status}
+              className="w-full border p-2"
+              defaultValue={
+                selectedIssue.status === "Resolved"
+                  ? "resolved"
+                  : selectedIssue.status === "In Progress"
+                  ? "in_progress"
+                  : "open"
+              }
               onChange={(e) =>
                 updateStatus(selectedIssue.id, e.target.value)
               }
             >
-              <option>Issue Raised</option>
-              <option>Authorities Contacted</option>
-              <option>Issue Resolved</option>
+              <option value="open">Pending</option>
+              <option value="in_progress">In Progress</option>
+              <option value="resolved">Resolved</option>
             </select>
-           <a
-  href={`http://localhost:8000/admin/issue/${selectedIssue.id}/pdf`}
-  target="_blank"
-  rel="noopener noreferrer"
-  className="block w-full text-center bg-green-600 text-white py-2 rounded mb-3 hover:bg-green-700"
->
-  Download Municipal PDF
-</a>
+
+            {/* BUTTONS */}
             <button
               onClick={() => setSelectedIssue(null)}
-              className="w-full bg-gray-200 py-2"
+              className="w-full bg-gray-200 py-2 rounded"
             >
               Close
             </button>

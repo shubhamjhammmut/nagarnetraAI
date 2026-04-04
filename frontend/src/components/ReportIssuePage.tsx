@@ -9,6 +9,7 @@ import { GoogleMapsPicker } from "./GoogleMapsPicker";
 import { calculateUrgency } from "../utils/urgencyCalculator";
 import { addIssue } from "../firebase/issueService";
 import DetectionCanvas from "./DetectionCanvas";
+import { uploadImageToFirebase } from "../utils/uploadImage"; 
 
 /* ================= UTILS ================= */
 
@@ -76,50 +77,99 @@ export function ReportIssuePage({ user }: ReportIssuePageProps) {
   /* =====================================================
      STEP 1️⃣ IMAGE UPLOAD → BACKEND AI
      ===================================================== */
-  const handleImageUpload = async (
-    e: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+const handleImageUpload = async (
+  e: React.ChangeEvent<HTMLInputElement>
+) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
 
-    setUploadedImage(file);
-    setPreviewUrl(URL.createObjectURL(file));
+  setUploadedImage(file);
+  setPreviewUrl(URL.createObjectURL(file));
 
-    setIsAnalyzing(true);
-    setIsAnalyzed(false);
-    setDuplicateIssue(null);
-    setVoteCount(null);
+  setIsAnalyzing(true);
+  setIsAnalyzed(false);
+  setDuplicateIssue(null);
+  setVoteCount(null);
+
+  try {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const res = await fetch("http://localhost:8000/detect", {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!res.ok) throw new Error("Detection failed");
+
+    const data = await res.json();
+    console.log("API RESPONSE:", data);
+
+    // 🔥 backend validation
+    if (!data || data.status !== "success") {
+      throw new Error("Backend error");
+    }
+
+    if (data.data?.error) {
+      console.error("Backend error:", data.data.error);
+      alert("AI service temporarily unavailable");
+      return;
+    }
+
+    const rawResult = data.data;
+
+    // 🔥 STEP 1: Clean string if needed
+    let cleaned = rawResult;
+
+    if (typeof cleaned === "string") {
+      cleaned = cleaned
+        .replace(/```json/g, "")
+        .replace(/```/g, "")
+        .trim();
+    }
+
+    // 🔥 STEP 2: Parse safely (handles nested JSON also)
+    let parsed: any;
 
     try {
-      const formData = new FormData();
-      formData.append("image", file);
+      parsed =
+        typeof cleaned === "string"
+          ? JSON.parse(cleaned)
+          : cleaned;
 
-      const res = await fetch("http://localhost:8000/detect", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!res.ok) throw new Error("Detection failed");
-
-      const data = await res.json();
-
-      setDetections(data.detections || []);
-      setDetectedIssue(data.primary_issue || "Civic Issue");
-
-      // 🔥 GEMINI AI DATA
-      setAiDescription(data.ai?.description_en || "");
-      setAiWhyMatters(data.ai?.why_it_matters || "");
-      setSeverityLevel(data.ai?.severity_level || "Low");
-
-      setIsAnalyzed(true);
+      // handle double-string JSON
+      if (typeof parsed === "string") {
+        parsed = JSON.parse(parsed);
+      }
     } catch (err) {
-      console.error(err);
-      alert("AI detection failed");
-    } finally {
-      setIsAnalyzing(false);
+      console.error("Parsing failed:", err);
+      parsed = {};
     }
-  };
 
+    // 🔥 STEP 3: Update state (UI SAFE)
+    setDetections([]);
+
+    setDetectedIssue(parsed.issue || "unknown");
+
+    setAiDescription(parsed.description || "");
+
+   setAiWhyMatters(parsed.why_it_matters || "");
+
+    setSeverityLevel(
+      parsed.severity
+        ? parsed.severity.charAt(0).toUpperCase() +
+            parsed.severity.slice(1)
+        : "Low"
+    );
+
+    setIsAnalyzed(true);
+  } catch (err) {
+    console.error(err);
+    alert("AI detection failed. Please try again.");
+  } finally {
+    setIsAnalyzing(false);
+  }
+};
   /* =====================================================
      STEP 2️⃣ LOCATION → URGENCY + DUPLICATE
      ===================================================== */
@@ -173,36 +223,42 @@ export function ReportIssuePage({ user }: ReportIssuePageProps) {
      STEP 3️⃣ SUBMIT → FIRESTORE
      ===================================================== */
   const handleSubmit = async () => {
-    if (!location.address || !urgencyLevel) {
-      alert("Please complete all steps");
-      return;
-    }
+  if (!location.address || !urgencyLevel || !uploadedImage) {
+    alert("Please complete all steps");
+    return;
+  }
 
-    setIsSubmitting(true);
+  setIsSubmitting(true);
 
-    try {
-      await addIssue({
-        title: detectedIssue,
-        description: aiDescription,
-        latitude: location.latitude,
-        longitude: location.longitude,
-        urgency: urgencyLevel,
-        urgencyScore,
-        aiAnalysis: aiWhyMatters,
-        votes: voteCount ?? 1,
-        status: "open",
-        userEmail: user.email,
-      });
+  try {
+    // 🔥 STEP 1: Upload image
+    const imageUrl = await uploadImageToFirebase(uploadedImage);
 
-      setIsSubmitted(true);
-    } catch (err) {
-      console.error(err);
-      alert("Failed to submit issue");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+    // 🔥 STEP 2: Save issue
+    await addIssue({
+      title: detectedIssue,
+      description: aiDescription,
+      latitude: location.latitude,
+      longitude: location.longitude,
+      address: location.address, // 🔥 ADD THIS
+      urgency: urgencyLevel,
+      urgencyScore,
+      aiAnalysis: aiWhyMatters,
+      votes: voteCount ?? 1,
+      status: "open",
+      userEmail: user.email,
+      imageUrl: imageUrl, // ✅ REAL URL
+    });
 
+    setIsSubmitted(true);
+  } catch (err) {
+    console.error(err);
+    alert("Failed to submit issue");
+  } finally {
+    setIsSubmitting(false);
+  }
+};
+       
   /* =====================================================
      UI
      ===================================================== */
