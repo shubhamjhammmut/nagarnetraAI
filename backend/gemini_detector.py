@@ -14,14 +14,12 @@ def extract_json(text):
         return json.loads(text)
     except:
         text = re.sub(r"```json|```", "", text).strip()
-
         match = re.search(r"\{.*\}", text, re.DOTALL)
         if match:
             try:
                 return json.loads(match.group())
             except:
                 pass
-
     return None
 
 
@@ -37,11 +35,6 @@ def analyze_image(image_bytes):
           "description": "clear short sentence",
           "why_it_matters": "1-2 lines explaining impact on public"
         }
-
-        IMPORTANT:
-        - Return ONLY JSON
-        - No markdown
-        - No explanation
         """
 
         response = client.models.generate_content(
@@ -63,13 +56,9 @@ def analyze_image(image_bytes):
         )
 
         raw_text = response.text
-
         parsed = extract_json(raw_text)
 
-        if parsed:
-            return parsed
-
-        return {
+        return parsed if parsed else {
             "issue": "unknown",
             "severity": "low",
             "confidence": 0.5,
