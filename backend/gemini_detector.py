@@ -3,8 +3,10 @@ import re
 from PIL import Image
 from google import genai
 import os
+from dotenv import load_dotenv
+load_dotenv()
+client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
-client = genai.Client(api_key="AIzaSyA8-_gEqiSEHcQuKtIa0mzlJugagV8fNLI")
 
 def extract_json(text):
     """Extract clean JSON from Gemini response"""
