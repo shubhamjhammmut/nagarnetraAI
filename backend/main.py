@@ -1,33 +1,10 @@
-
 from fastapi import FastAPI, UploadFile, File
-import shutil
-import os
+from fastapi.middleware.cors import CORSMiddleware
 from gemini_detector import analyze_image
 
 app = FastAPI()
 
-@app.get("/")
-def root():
-    return {"message": "Nagarnetra Gemini Backend Running"}
-
-@app.post("/detect")
-async def detect_issue(file: UploadFile = File(...)):
-    file_path = f"temp_{file.filename}"
-
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
-
-    result = analyze_image(file_path)
-
-    os.remove(file_path)
-
-    return {
-        "status": "success",
-        "data": result
-    }
-
-from fastapi.middleware.cors import CORSMiddleware
-
+# ✅ CORS (keep as is)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -35,3 +12,34 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ✅ Root endpoint
+@app.get("/")
+def root():
+    return {"message": "Nagarnetra Gemini Backend Running"}
+
+# ✅ FIXED DETECT ENDPOINT (NO FILE SAVE)
+@app.post("/detect")
+async def detect_issue(file: UploadFile = File(...)):
+    try:
+        # 🔥 READ IMAGE IN MEMORY (IMPORTANT FIX)
+        image_bytes = await file.read()
+
+        print("Received file:", file.filename)
+        print("Content type:", file.content_type)
+        print("Size:", len(image_bytes))
+
+        # 🔥 SEND BYTES TO GEMINI
+        result = analyze_image(image_bytes)
+
+        return {
+            "status": "success",
+            "data": result
+        }
+
+    except Exception as e:
+        print("ERROR:", e)
+        return {
+            "status": "error",
+            "data": str(e)
+        }
