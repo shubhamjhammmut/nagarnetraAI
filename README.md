@@ -229,9 +229,8 @@ GEMINI_API_KEY
 
 **Shubham Kumar Jha**
 
-* 🚀 Startup: Silaibuddy
 * 🏆 Finalist – Disrupt IIT Guwahati
-* 💻 Web Developer | AI Builder
+* 💻 Web Developer | Coder
 
 ---
 
